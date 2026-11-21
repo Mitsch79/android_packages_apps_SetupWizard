@@ -16,6 +16,12 @@
 
     <string name="next">Next</string>
     <string name="skip">Skip</string>
+    <string name="protect_tablet_title">Protect your tablet</string>
+    <string name="protect_tablet_description">Use a pattern, PIN, or password to unlock your tablet.</string>
+    <string name="set_up_screen_lock">Set up screen lock</string>
+    <string name="screen_lock_later">Not now</string>
+    <string name="skip_screen_lock_title">Skip screen lock?</string>
+    <string name="skip_screen_lock_message">Anyone who picks up your tablet will be able to use it. You can set up a screen lock later in Settings.</string>
     <string name="start">Start</string>
     <string name="done">Done</string>
     <string name="ok">OK</string>

@@ -11,23 +11,5 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        style="@style/SudContentFrame">
-
-        <View
-            android:id="@+id/page"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <org.lineageos.setupwizard.NavigationLayout
-            android:id="@+id/navigation_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:showSkipButton="true" />
-
-    </LinearLayout>
+    <include layout="@layout/restore_page_body" />
 </com.google.android.setupdesign.GlifLayout>

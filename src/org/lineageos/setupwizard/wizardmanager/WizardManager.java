@@ -28,6 +28,8 @@ import com.google.android.setupcompat.util.ResultCodes;
 
 import org.lineageos.setupwizard.util.SetupWizardUtils;
 import org.lineageos.setupwizard.NetworkSetupActivity;
+import org.lineageos.setupwizard.DeviceSpecificActivity;
+import org.lineageos.setupwizard.UpdateRecoveryActivity;
 import org.lineageos.setupwizard.R;
 
 import java.util.HashMap;
@@ -101,7 +103,7 @@ public class WizardManager extends Activity {
     }
 
     /** Resolve the regular local script without starting a forwarding activity for each tap. */
-    public static Intent resolveEarlyPage(Context context, Intent next) {
+    public static Intent resolveLocalPage(Context context, Intent next) {
         Bundle state = next.getBundleExtra(EXTRA_WIZARD_BUNDLE);
         ComponentName manager = new ComponentName(context, WizardManager.class);
         if (state == null || !manager.equals(next.resolveActivity(context.getPackageManager()))) {
@@ -113,12 +115,28 @@ public class WizardManager extends Activity {
         }
         WizardAction action = checkNextAction(context, uri, state.getString(EXTRA_ACTION_ID),
                 next.getIntExtra(EXTRA_RESULT_CODE, 0));
-        if (action != null && new ComponentName(context, NetworkSetupActivity.class).equals(
-                action.getIntent().resolveActivity(context.getPackageManager()))
-                && NetworkSetupActivity.shouldSkip(context)) {
-            action = checkNextAction(context, uri, action.getId(), ResultCodes.RESULT_SKIP);
+        while (action != null) {
+            ComponentName page = action.getIntent().resolveActivity(context.getPackageManager());
+            int result;
+            if (new ComponentName(context, DeviceSpecificActivity.class).equals(page)
+                    && new Intent(DeviceSpecificActivity.ACTION_SETUP_DEVICE)
+                            .resolveActivity(context.getPackageManager()) == null) {
+                result = RESULT_OK;
+            } else if ((new ComponentName(context, NetworkSetupActivity.class).equals(page)
+                    && NetworkSetupActivity.shouldSkip(context))
+                    || (new ComponentName(context, UpdateRecoveryActivity.class).equals(page)
+                    && !SetupWizardUtils.hasRecoveryUpdater(context))) {
+                result = ResultCodes.RESULT_SKIP;
+            } else {
+                Intent intent = createActionIntent(uri, action, next);
+                if (page != null && context.getPackageName().equals(page.getPackageName())) {
+                    intent.setComponent(page);
+                }
+                return intent;
+            }
+            action = checkNextAction(context, uri, action.getId(), result);
         }
-        return action == null ? next : createActionIntent(uri, action, next);
+        return next;
     }
 
     private void load(String scriptUri, Intent extras) {

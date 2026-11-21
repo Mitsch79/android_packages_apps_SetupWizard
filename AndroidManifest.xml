@@ -104,7 +104,7 @@
         <activity
             android:name=".WelcomeActivity"
             android:label="@string/activity_label_empty"
-            android:configChanges="mcc|mnc"
+            android:configChanges="mcc|mnc|locale|layoutDirection"
             android:immersive="true"
             android:exported="false"
             android:windowSoftInputMode="stateAlwaysHidden">

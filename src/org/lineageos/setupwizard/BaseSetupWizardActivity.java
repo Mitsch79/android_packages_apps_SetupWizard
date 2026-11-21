@@ -53,6 +53,10 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
     private NavigationLayout mNavigationBar;
 
     private ActivityResultLauncher<Intent> mNextIntentResultLauncher;
+    private ActivityResultLauncher<Intent> mRestoreLauncher;
+    private ActivityResultLauncher<Intent> mLockLauncher;
+    private LocalSetupPages mPages;
+    private ActivityResult mRestoredLockResult;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -67,6 +71,16 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
         mNextIntentResultLauncher = registerForActivityResult(
                 new StartDecoratedActivityForResult(),
                 BaseSetupWizardActivity.this::onNextIntentResult);
+        mRestoreLauncher = registerForActivityResult(new StartDecoratedActivityForResult(), r -> {
+            if (r.getResultCode() != RESULT_CANCELED) nextAction(r.getResultCode(), r.getData());
+        });
+        mLockLauncher = registerForActivityResult(new StartDecoratedActivityForResult(), r -> {
+            if (mPages != null) {
+                mPages.lockResult(r.getResultCode(), r.getData());
+            } else {
+                mRestoredLockResult = r;
+            }
+        });
         initLayout();
         mNavigationBar = getNavigationBar();
         if (mNavigationBar != null) {
@@ -94,6 +108,19 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
     }
 
     @Override
+    protected void onPostCreate(Bundle state) {
+        super.onPostCreate(state);
+        if (this instanceof WelcomeActivity || this instanceof PaneActivity) {
+            mPages = new LocalSetupPages(this);
+            mPages.restore(state);
+            if (mRestoredLockResult != null) {
+                mPages.lockResult(mRestoredLockResult.getResultCode(), mRestoredLockResult.getData());
+                mRestoredLockResult = null;
+            }
+        }
+    }
+
+    @Override
     protected void onRestart() {
         if (LOGV) {
             logActivityState("onRestart");
@@ -107,6 +134,7 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
             logActivityState("onResume");
         }
         super.onResume();
+        if (mPages != null) mPages.refresh();
     }
 
     @Override
@@ -160,6 +188,7 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
+        if (mPages != null) mPages.save(outState);
         View current = getCurrentFocus();
         outState.putInt("currentFocus", current != null ? current.getId() : -1);
         if (LOGV) {
@@ -254,6 +283,54 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
     }
 
     protected final void nextAction(int resultCode, Intent data) {
+        Intent shown = mPages == null ? null : mPages.intent();
+        advanceFrom(shown == null ? currentStepIntent() : shown, resultCode, data);
+    }
+
+    final void skipCurrentPane() {
+        mPages.skip();
+    }
+
+    protected final boolean hasLocalPage() {
+        return mPages != null && mPages.intent() != null;
+    }
+
+    protected final void updateLocalPageResources() {
+        if (hasLocalPage()) mPages.configurationChanged();
+    }
+
+    final void finishSkippedPane(Intent step) {
+        Intent next = WizardManagerHelper.getNextIntent(step, RESULT_OK, null);
+        mNextIntentResultLauncher.launch(WizardManager.resolveLocalPage(this, next));
+        finish();
+    }
+
+    final void launchRestore() {
+        Intent step = mPages.intent();
+        Intent target = delegatedIntent(step, SetupWizardApp.ACTION_RESTORE_FROM_BACKUP);
+        try {
+            mRestoreLauncher.launch(target);
+        } catch (android.content.ActivityNotFoundException e) {
+            nextAction(com.google.android.setupcompat.util.ResultCodes.RESULT_ACTIVITY_NOT_FOUND);
+        }
+    }
+
+    final void launchLock(Intent step) {
+        mLockLauncher.launch(delegatedIntent(step, ScreenLockActivity.ACTION_SETUP_LOCKSCREEN));
+    }
+
+    private Intent delegatedIntent(Intent step, String action) {
+        Intent target = new Intent(action);
+        Bundle state = step.getBundleExtra(SetupWizardApp.EXTRA_WIZARD_BUNDLE);
+        if (state != null) {
+            Bundle copy = new Bundle(state);
+            copy.putFloat(WizardManagerHelper.EXTRA_SETUP_WINDOW_BRIGHTNESS, getWindow().getAttributes().screenBrightness);
+            target.putExtra(SetupWizardApp.EXTRA_WIZARD_BUNDLE, copy);
+        }
+        return target;
+    }
+
+    final void advanceFrom(Intent step, int resultCode, Intent data) {
         if (LOGV) {
             Log.v(TAG, "nextAction resultCode=" + resultCode +
                     " data=" + data + " this=" + this);
@@ -262,10 +339,9 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
             throw new IllegalArgumentException("Cannot call nextAction with RESULT_CANCELED");
         }
         setResult(resultCode, data);
-        Intent intent = WizardManagerHelper.getNextIntent(currentStepIntent(), resultCode, data);
-        if (this instanceof WelcomeActivity || this instanceof LocaleActivity) {
-            intent = WizardManager.resolveEarlyPage(this, intent);
-        }
+        Intent intent = WizardManagerHelper.getNextIntent(step, resultCode, data);
+        intent = WizardManager.resolveLocalPage(this, intent);
+        if (mPages != null && mPages.open(intent)) return;
         if (!showLocalStep(intent)) {
             mNextIntentResultLauncher.launch(intent);
         }

@@ -10,7 +10,7 @@ import android.content.Intent;
 
 public class DeviceSpecificActivity extends SubBaseActivity {
 
-    private static final String ACTION_SETUP_DEVICE = "org.lineageos.settings.device.SUW_SETTINGS";
+    public static final String ACTION_SETUP_DEVICE = "org.lineageos.settings.device.SUW_SETTINGS";
 
     protected void onStartSubactivity() {
         Intent intent = new Intent(ACTION_SETUP_DEVICE);

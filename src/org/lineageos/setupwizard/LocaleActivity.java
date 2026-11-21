@@ -95,7 +95,7 @@ public class LocaleActivity extends DateTimePageHost {
         View decor = getWindow().getDecorView();
         decor.getViewTreeObserver().addOnDrawListener(() -> {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
-                String page = mDateStep == null ? "Language" : "Date";
+                String page = drawnPage();
                 Trace.traceBegin(Trace.TRACE_TAG_VIEW,
                         "WizardPage:" + page + ":" + Choreographer.getInstance().getVsyncId());
                 Trace.traceEnd(Trace.TRACE_TAG_VIEW);
@@ -122,7 +122,20 @@ public class LocaleActivity extends DateTimePageHost {
         bindDateControls(mDateContent);
     }
 
-    private void displayStep(Intent date) {
+    protected String drawnPage() {
+        if (mDateStep != null) return "Date";
+        return mLocales == null ? "Loading" : "Language";
+    }
+
+    protected final boolean showingDate() {
+        return mDateStep != null;
+    }
+
+    final void restoreEarlyPage() {
+        displayStep(mDateStep);
+    }
+
+    protected final void displayStep(Intent date) {
         mDateStep = date;
         boolean showDate = date != null;
         if (showDate) {
@@ -132,7 +145,7 @@ public class LocaleActivity extends DateTimePageHost {
             stopDateControls();
         }
         findViewById(R.id.language_content).setVisibility(showDate ? View.GONE : View.VISIBLE);
-        mDateContent.setVisibility(showDate ? View.VISIBLE : View.GONE);
+        if (mDateContent != null) mDateContent.setVisibility(showDate ? View.VISIBLE : View.GONE);
         updatePageHeader();
         updateDescription();
         mDateBack.setEnabled(showDate);
@@ -171,10 +184,14 @@ public class LocaleActivity extends DateTimePageHost {
     public void onConfigurationChanged(Configuration config) {
         super.onConfigurationChanged(config);
         WizardPageData.zones(this);
+        getWindow().getDecorView().setLayoutDirection(config.getLayoutDirection());
+        if (hasLocalPage()) {
+            updateLocalPageResources();
+            return;
+        }
         // Keep the navigation button and its input window alive during translation.
         getGlifLayout().setHeaderText(getText(getTitleResId()));
         setNextText(R.string.next);
-        getWindow().getDecorView().setLayoutDirection(config.getLayoutDirection());
         if (mDateStep != null) {
             prepareDateContent();
             updateDescription();
@@ -297,7 +314,8 @@ public class LocaleActivity extends DateTimePageHost {
     }
 
     private void fetchAndUpdateSimLocale() {
-        if (((SetupWizardApp) getApplication()).ignoreSimLocale() || isDestroyed()) {
+        if (!getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
+                || ((SetupWizardApp) getApplication()).ignoreSimLocale() || isDestroyed()) {
             return;
         }
         if (mPaused) {

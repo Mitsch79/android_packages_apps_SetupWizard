@@ -8,6 +8,12 @@
     <string name="app_name">Einrichtungsassistent</string>
     <string name="next">Weiter</string>
     <string name="skip">Überspringen</string>
+    <string name="protect_tablet_title">Tablet schützen</string>
+    <string name="protect_tablet_description">Entsperre dein Tablet mit einem Muster, einer PIN oder einem Passwort.</string>
+    <string name="set_up_screen_lock">Displaysperre einrichten</string>
+    <string name="screen_lock_later">Jetzt nicht</string>
+    <string name="skip_screen_lock_title">Displaysperre überspringen?</string>
+    <string name="skip_screen_lock_message">Wer dein Tablet in die Hand nimmt, kann es verwenden. Du kannst später in den Einstellungen eine Displaysperre einrichten.</string>
     <string name="start">Start</string>
     <string name="done">Fertig</string>
     <string name="ok">OK</string>

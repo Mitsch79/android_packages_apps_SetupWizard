@@ -126,6 +126,13 @@ public class FinishActivity extends BaseSetupWizardActivity {
         hideNextButton();
     }
 
+    static void completeFrom(BaseSetupWizardActivity host, Intent step) {
+        if (sIsFinishing) return;
+        sIsFinishing = true;
+        host.startActivity(new Intent(step).setClass(host, FinishActivity.class));
+        host.finish();
+    }
+
     private void startFinishSequence() {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
         hideNextButton();
