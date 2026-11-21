@@ -38,7 +38,6 @@ public class BluetoothSetupActivity extends SubBaseActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error starting bluetooth setup", e);
             finishAction(RESULT_OK);
-            SetupWizardUtils.disableComponent(this, BluetoothSetupActivity.class);
         }
     }
 

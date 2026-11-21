@@ -70,7 +70,10 @@ public abstract class SubBaseActivity extends BaseSetupWizardActivity {
         Intent intent = getIntent();
         Bundle wizardBundle = intent.getBundleExtra(EXTRA_WIZARD_BUNDLE);
         if (wizardBundle.containsKey(EXTRA_SCRIPT_URI)) {
-            subactivityIntent.putExtra(EXTRA_WIZARD_BUNDLE, wizardBundle);
+            Bundle state = new Bundle(wizardBundle);
+            state.putFloat(com.google.android.setupcompat.util.WizardManagerHelper
+                    .EXTRA_SETUP_WINDOW_BRIGHTNESS, getWindow().getAttributes().screenBrightness);
+            subactivityIntent.putExtra(EXTRA_WIZARD_BUNDLE, state);
         }
         try {
             mSubactivityResultLauncher.launch(subactivityIntent);

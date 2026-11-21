@@ -34,6 +34,8 @@ public class NavigationSettingsActivity extends BaseSetupWizardActivity {
 
     private SetupWizardApp mSetupWizardApp;
 
+    private static final String DRAFT_MODE = "draft_navigation_mode";
+    private static final String DRAFT_HINT = "draft_hide_navigation_hint";
     private boolean mIsTaskbarEnabled;
 
     private String mSelection = NAV_BAR_MODE_GESTURAL_OVERLAY;
@@ -83,6 +85,7 @@ public class NavigationSettingsActivity extends BaseSetupWizardActivity {
             mSetupWizardApp.getSettingsBundle().putString(NAVIGATION_OPTION_KEY,
                     NAV_BAR_MODE_3BUTTON_OVERLAY);
             finishAction(RESULT_OK);
+            return;
         }
 
         final LottieAnimationView navigationIllustration =
@@ -115,8 +118,32 @@ public class NavigationSettingsActivity extends BaseSetupWizardActivity {
                     break;
             }
 
+            mSetupWizardApp.getSettingsBundle().putString(DRAFT_MODE, mSelection);
             navigationIllustration.playAnimation();
         });
+        Bundle draft = mSetupWizardApp.getSettingsBundle();
+        String desired = draft.getString(DRAFT_MODE, mSelection);
+        int id = NAV_BAR_MODE_2BUTTON_OVERLAY.equals(desired) ? R.id.radio_two_button
+                : NAV_BAR_MODE_3BUTTON_OVERLAY.equals(desired) ? R.id.radio_sw_keys
+                : R.id.radio_gesture;
+        if (findViewById(id).getVisibility() != View.VISIBLE) {
+            for (int i = 0; i < radioGroup.getChildCount(); i++) {
+                View choice = radioGroup.getChildAt(i);
+                if (choice instanceof RadioButton && choice.getVisibility() == View.VISIBLE) {
+                    id = choice.getId();
+                    break;
+                }
+            }
+        }
+        radioGroup.clearCheck();
+        radioGroup.check(id);
+        if (!mIsTaskbarEnabled) {
+            mHideGesturalHint.setChecked(draft.getBoolean(DRAFT_HINT,
+                    LineageSettings.System.getIntForUser(getContentResolver(),
+                            LineageSettings.System.NAVIGATION_BAR_HINT, 1, UserHandle.USER_CURRENT) == 0));
+            mHideGesturalHint.setOnCheckedChangeListener((button, value) ->
+                    draft.putBoolean(DRAFT_HINT, value));
+        }
     }
 
     private void revealHintCheckbox() {

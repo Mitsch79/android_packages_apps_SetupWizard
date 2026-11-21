@@ -16,6 +16,8 @@ import android.widget.CheckBox;
 
 public class LocationSettingsActivity extends BaseSetupWizardActivity {
 
+    private static final String DRAFT_LOCATION = "draft_location";
+    private static final String DRAFT_AGPS = "draft_agps";
     private CheckBox mLocationAccess;
     private CheckBox mLocationAgpsAccess;
 
@@ -51,7 +53,15 @@ public class LocationSettingsActivity extends BaseSetupWizardActivity {
         if (mUserManager.isManagedProfile()) {
             checked &= mUserManager.hasUserRestriction(UserManager.DISALLOW_SHARE_LOCATION);
         }
-        mLocationAccess.setChecked(checked);
+        Bundle draft = SetupWizardApp.getSettingsBundle();
+        mLocationAccess.setChecked(draft.getBoolean(DRAFT_LOCATION, checked));
+        mLocationAgpsAccess.setChecked(draft.getBoolean(DRAFT_AGPS, Settings.Global.getInt(
+                getContentResolver(), Settings.Global.ASSISTED_GPS_ENABLED,
+                mLocationAgpsAccess.isChecked() ? 1 : 0) != 0));
+        mLocationAccess.setOnCheckedChangeListener((button, value) ->
+                draft.putBoolean(DRAFT_LOCATION, value));
+        mLocationAgpsAccess.setOnCheckedChangeListener((button, value) ->
+                draft.putBoolean(DRAFT_AGPS, value));
     }
 
     @Override

@@ -8,8 +8,6 @@ package org.lineageos.setupwizard;
 import android.content.ComponentName;
 import android.content.Intent;
 
-import org.lineageos.setupwizard.util.SetupWizardUtils;
-
 public class DeviceSpecificActivity extends SubBaseActivity {
 
     private static final String ACTION_SETUP_DEVICE = "org.lineageos.settings.device.SUW_SETTINGS";
@@ -20,7 +18,7 @@ public class DeviceSpecificActivity extends SubBaseActivity {
         if (name != null) {
             startSubactivity(intent);
         } else {
-            SetupWizardUtils.disableComponent(this, DeviceSpecificActivity.class);
+            // Disabling a component in this task also finishes the pages below it.
             finishAction(RESULT_OK);
         }
     }

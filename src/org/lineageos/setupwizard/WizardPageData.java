@@ -12,23 +12,22 @@ import java.util.Calendar;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
 
 /** Prepare data with an application context. The activity creates and owns every view. */
 final class WizardPageData {
     private static final Executor WORKER = Executors.newSingleThreadExecutor();
     private static Configuration languageConfig;
     private static boolean developer;
-    private static FutureTask<List<LocalePicker.LocaleInfo>> languages;
+    private static CompletableFuture<List<LocalePicker.LocaleInfo>> languages;
     private static Configuration zoneConfig;
     private static long zoneDay;
     private static String zoneId;
-    private static FutureTask<List<Map<String, Object>>> zones;
+    private static CompletableFuture<List<Map<String, Object>>> zones;
 
-    static synchronized FutureTask<List<LocalePicker.LocaleInfo>> languages(Context context) {
+    static synchronized CompletableFuture<List<LocalePicker.LocaleInfo>> languages(Context context) {
         Configuration config = context.getResources().getConfiguration();
         boolean dev = Settings.Global.getInt(context.getContentResolver(),
                 Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0;
@@ -36,13 +35,12 @@ final class WizardPageData {
             languageConfig = new Configuration(config);
             developer = dev;
             Context app = context.getApplicationContext().createConfigurationContext(languageConfig);
-            languages = new FutureTask<>(() -> LocalePicker.getAllAssetLocales(app, dev));
-            WORKER.execute(languages);
+            languages = CompletableFuture.supplyAsync(() -> LocalePicker.getAllAssetLocales(app, dev), WORKER);
         }
         return languages;
     }
 
-    static synchronized FutureTask<List<Map<String, Object>>> zones(Context context) {
+    static synchronized CompletableFuture<List<Map<String, Object>>> zones(Context context) {
         Configuration config = context.getResources().getConfiguration();
         Calendar now = Calendar.getInstance();
         long day = now.get(Calendar.YEAR) * 366L + now.get(Calendar.DAY_OF_YEAR);
@@ -52,24 +50,12 @@ final class WizardPageData {
             zoneDay = day;
             zoneId = id;
             Context app = context.getApplicationContext().createConfigurationContext(zoneConfig);
-            zones = new FutureTask<>(() -> {
+            zones = CompletableFuture.supplyAsync(() -> {
                 List<Map<String, Object>> rows = ZoneGetter.getZonesList(app);
                 rows.sort(Comparator.comparingInt(row -> (Integer) row.get("offset")));
                 return rows;
-            });
-            WORKER.execute(zones);
+            }, WORKER);
         }
         return zones;
-    }
-
-    static <T> T ready(FutureTask<T> task) {
-        try {
-            return task.get();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException(e.getCause());
-        }
     }
 }

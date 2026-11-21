@@ -194,6 +194,10 @@ public class LocaleActivity extends DateTimePageHost {
 
     @Override
     protected void onDestroy() {
+        if (isFinishing() && mHandler.hasCallbacks(mUpdateLocale)) {
+            mHandler.removeCallbacks(mUpdateLocale);
+            mUpdateLocale.run();
+        }
         mHandler.removeCallbacks(mUpdateLocale);
         super.onDestroy();
     }
@@ -212,7 +216,7 @@ public class LocaleActivity extends DateTimePageHost {
         if (mDateStep != null) startDateControls();
         registerReceiver(mSimChangedReceiver,
                 new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED));
-        if (mLanguagePicker != null) {
+        if (mLocales != null) {
             mLanguagePicker.setEnabled(true);
         }
         if (mPendingLocaleUpdate) {
@@ -237,7 +241,16 @@ public class LocaleActivity extends DateTimePageHost {
     }
 
     private void loadLanguages() {
-        mLocales = WizardPageData.ready(WizardPageData.languages(this));
+        mLanguagePicker.setEnabled(false);
+        WizardPageData.languages(this).thenAcceptAsync(locales -> {
+            if (isFinishing() || isDestroyed()) return;
+            mLocales = locales;
+            bindLanguages();
+        }, getMainExecutor());
+    }
+
+    private void bindLanguages() {
+        mLanguagePicker.setEnabled(true);
         WizardPageData.zones(this);
         mCurrentLocale = Locale.getDefault();
         fetchAndUpdateSimLocale();

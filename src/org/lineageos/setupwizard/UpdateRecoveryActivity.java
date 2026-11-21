@@ -52,6 +52,8 @@ public class UpdateRecoveryActivity extends BaseSetupWizardActivity {
         }
 
         sFirstTime = false;
+        mRecoveryUpdateCheckbox.setOnCheckedChangeListener((button, checked) ->
+                mSetupWizardApp.getSettingsBundle().putBoolean(ENABLE_RECOVERY_UPDATE, checked));
     }
 
     @Override

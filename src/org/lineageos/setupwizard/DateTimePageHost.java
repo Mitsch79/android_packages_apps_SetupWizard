@@ -43,7 +43,7 @@ abstract class DateTimePageHost extends BaseSetupWizardActivity implements
     private TextView mTimeTextView;
 
     private boolean mWatchingTime;
-    private List<Map<String, Object>> mBoundZones;
+    private java.util.concurrent.CompletableFuture<List<Map<String, Object>>> mZoneRequest;
 
     private final BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -53,20 +53,29 @@ abstract class DateTimePageHost extends BaseSetupWizardActivity implements
     };
 
     protected final void bindDateControls(View root) {
-        List<Map<String, Object>> zones = WizardPageData.ready(WizardPageData.zones(this));
-        if (zones == mBoundZones) return;
-        mBoundZones = zones;
+        var request = WizardPageData.zones(this);
+        if (request == mZoneRequest) return;
+        mZoneRequest = request;
         ((TextView) root.findViewById(R.id.date_title)).setText(R.string.setup_current_date);
         ((TextView) root.findViewById(R.id.time_title)).setText(R.string.setup_current_time);
         final Spinner spinner = root.findViewById(R.id.timezone_list);
-        final SimpleAdapter adapter = constructTimezoneAdapter(this, zones);
-        mCurrentTimeZone = TimeZone.getDefault();
+        spinner.setEnabled(false);
         View dateView = root.findViewById(R.id.date_item);
         dateView.setOnClickListener((view) -> showDatePicker());
         View timeView = root.findViewById(R.id.time_item);
         timeView.setOnClickListener((view) -> showTimePicker());
         mDateTextView = root.findViewById(R.id.date_text);
         mTimeTextView = root.findViewById(R.id.time_text);
+        request.thenAcceptAsync(zones -> {
+            if (request != mZoneRequest || isFinishing() || isDestroyed()) return;
+            bindZones(spinner, zones);
+        }, getMainExecutor());
+    }
+
+    private void bindZones(Spinner spinner, List<Map<String, Object>> zones) {
+        SimpleAdapter adapter = constructTimezoneAdapter(this, zones);
+        mCurrentTimeZone = TimeZone.getDefault();
+        spinner.setEnabled(true);
         // Pre-select current/default timezone
         int tzIndex = getTimeZoneIndex(adapter, mCurrentTimeZone);
         spinner.setOnItemSelectedListener(null);
