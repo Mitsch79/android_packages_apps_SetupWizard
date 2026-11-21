@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -51,7 +52,6 @@ public class LocaleActivity extends BaseSetupWizardActivity {
     private final Runnable mUpdateLocale = new Runnable() {
         public void run() {
             if (mCurrentLocale != null) {
-                mLanguagePicker.setEnabled(false);
                 com.android.internal.app.LocalePicker.updateLocale(mCurrentLocale);
             }
         }
@@ -78,6 +78,31 @@ public class LocaleActivity extends BaseSetupWizardActivity {
             mLanguagePicker.setOnClickListener((View v) -> getNextButton().performClick());
         }
         loadLanguages();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration config) {
+        super.onConfigurationChanged(config);
+        // Keep the navigation button and its input window alive during translation.
+        getGlifLayout().setHeaderText(getText(getTitleResId()));
+        setNextText(R.string.next);
+        getWindow().getDecorView().setLayoutDirection(config.getLayoutDirection());
+    }
+
+    @Override
+    protected void onNextPressed() {
+        // A quick tap can precede the debounced system-wide language change.
+        if (mHandler.hasCallbacks(mUpdateLocale)) {
+            mHandler.removeCallbacks(mUpdateLocale);
+            mUpdateLocale.run();
+        }
+        super.onNextPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        mHandler.removeCallbacks(mUpdateLocale);
+        super.onDestroy();
     }
 
     @Override

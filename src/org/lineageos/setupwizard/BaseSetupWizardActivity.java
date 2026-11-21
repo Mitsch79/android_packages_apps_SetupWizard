@@ -24,6 +24,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 
 import androidx.activity.OnBackPressedCallback;
@@ -58,6 +59,10 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
             logActivityState("onCreate savedInstanceState=" + savedInstanceState);
         }
         super.onCreate(savedInstanceState);
+        // Use a readable backlight for the V500 setup pages, leaving the user's setting intact.
+        WindowManager.LayoutParams windowParams = getWindow().getAttributes();
+        windowParams.screenBrightness = 0.70f;
+        getWindow().setAttributes(windowParams);
         mNextIntentResultLauncher = registerForActivityResult(
                 new StartDecoratedActivityForResult(),
                 BaseSetupWizardActivity.this::onNextIntentResult);
