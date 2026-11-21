@@ -32,6 +32,8 @@ public class WelcomeActivity extends SubBaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         onSetupStart();
+        WizardPageData.languages(this);
+        WizardPageData.zones(this);
         SystemBarHelper.setBackButtonVisible(getWindow(), false);
         setNextText(R.string.start);
         Button startButton = findViewById(R.id.start);

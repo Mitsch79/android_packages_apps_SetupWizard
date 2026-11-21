@@ -18,6 +18,7 @@ import static org.lineageos.setupwizard.SetupWizardApp.LOGV;
 import android.annotation.Nullable;
 import android.app.Activity;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -26,6 +27,8 @@ import android.util.Log;
 import com.google.android.setupcompat.util.ResultCodes;
 
 import org.lineageos.setupwizard.util.SetupWizardUtils;
+import org.lineageos.setupwizard.NetworkSetupActivity;
+import org.lineageos.setupwizard.R;
 
 import java.util.HashMap;
 
@@ -73,6 +76,12 @@ public class WizardManager extends Activity {
     }
 
     private void doAction(String scriptUri, WizardAction action, Intent extras) {
+        Intent intent = createActionIntent(scriptUri, action, extras);
+        intent.addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
+        startActivity(intent);
+    }
+
+    private static Intent createActionIntent(String scriptUri, WizardAction action, Intent extras) {
         Intent intent = action.getIntent();
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         if (LOGV) {
@@ -88,8 +97,28 @@ public class WizardManager extends Activity {
         wizardBundle.putString(EXTRA_SCRIPT_URI, scriptUri);
         wizardBundle.putString(EXTRA_ACTION_ID, action.getId());
         intent.putExtra(EXTRA_WIZARD_BUNDLE, wizardBundle);
-        intent.addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
-        startActivity(intent);
+        return intent;
+    }
+
+    /** Resolve the regular local script without starting a forwarding activity for each tap. */
+    public static Intent resolveEarlyPage(Context context, Intent next) {
+        Bundle state = next.getBundleExtra(EXTRA_WIZARD_BUNDLE);
+        ComponentName manager = new ComponentName(context, WizardManager.class);
+        if (state == null || !manager.equals(next.resolveActivity(context.getPackageManager()))) {
+            return next;
+        }
+        String uri = state.getString(EXTRA_SCRIPT_URI);
+        if (!context.getString(R.string.lineage_wizard_script_uri).equals(uri)) {
+            return next;
+        }
+        WizardAction action = checkNextAction(context, uri, state.getString(EXTRA_ACTION_ID),
+                next.getIntExtra(EXTRA_RESULT_CODE, 0));
+        if (action != null && new ComponentName(context, NetworkSetupActivity.class).equals(
+                action.getIntent().resolveActivity(context.getPackageManager()))
+                && NetworkSetupActivity.shouldSkip(context)) {
+            action = checkNextAction(context, uri, action.getId(), ResultCodes.RESULT_SKIP);
+        }
+        return action == null ? next : createActionIntent(uri, action, next);
     }
 
     private void load(String scriptUri, Intent extras) {

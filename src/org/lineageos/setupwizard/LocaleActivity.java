@@ -20,7 +20,6 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.NumberPicker;
 import android.widget.Toast;
 
@@ -40,9 +39,8 @@ public class LocaleActivity extends BaseSetupWizardActivity {
 
     private static final String TAG = LocaleActivity.class.getSimpleName();
 
-    private ArrayAdapter<com.android.internal.app.LocalePicker.LocaleInfo> mLocaleAdapter;
+    private List<com.android.internal.app.LocalePicker.LocaleInfo> mLocales;
     private Locale mCurrentLocale;
-    private int[] mAdapterIndices;
     private LocalePicker mLanguagePicker;
     private ExecutorService mFetchUpdateSimLocaleTask;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
@@ -83,6 +81,7 @@ public class LocaleActivity extends BaseSetupWizardActivity {
     @Override
     public void onConfigurationChanged(Configuration config) {
         super.onConfigurationChanged(config);
+        WizardPageData.zones(this);
         // Keep the navigation button and its input window alive during translation.
         getGlifLayout().setHeaderText(getText(getTitleResId()));
         setNextText(R.string.next);
@@ -143,21 +142,19 @@ public class LocaleActivity extends BaseSetupWizardActivity {
     }
 
     private void loadLanguages() {
-        mLocaleAdapter = com.android.internal.app.LocalePicker.constructAdapter(this,
-                R.layout.locale_picker_item, R.id.locale);
+        mLocales = WizardPageData.ready(WizardPageData.languages(this));
+        WizardPageData.zones(this);
         mCurrentLocale = Locale.getDefault();
         fetchAndUpdateSimLocale();
-        mAdapterIndices = new int[mLocaleAdapter.getCount()];
         int currentLocaleIndex = 0;
-        String[] labels = new String[mLocaleAdapter.getCount()];
-        for (int i = 0; i < mAdapterIndices.length; i++) {
+        String[] labels = new String[mLocales.size()];
+        for (int i = 0; i < labels.length; i++) {
             com.android.internal.app.LocalePicker.LocaleInfo localLocaleInfo =
-                    mLocaleAdapter.getItem(i);
+                    mLocales.get(i);
             Locale localLocale = localLocaleInfo.getLocale();
             if (localLocale.equals(mCurrentLocale)) {
                 currentLocaleIndex = i;
             }
-            mAdapterIndices[i] = i;
             labels[i] = localLocaleInfo.getLabel();
         }
         mLanguagePicker.setDisplayedValues(labels);
@@ -175,9 +172,9 @@ public class LocaleActivity extends BaseSetupWizardActivity {
 
     private void setLocaleFromPicker() {
         ((SetupWizardApp) getApplication()).setIgnoreSimLocale(true);
-        int i = mAdapterIndices[mLanguagePicker.getValue()];
+        int i = mLanguagePicker.getValue();
         final com.android.internal.app.LocalePicker.LocaleInfo localLocaleInfo =
-                mLocaleAdapter.getItem(i);
+                mLocales.get(i);
         onLocaleChanged(localLocaleInfo.getLocale());
     }
 

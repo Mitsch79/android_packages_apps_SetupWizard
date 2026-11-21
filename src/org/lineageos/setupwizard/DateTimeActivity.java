@@ -29,12 +29,9 @@ import android.widget.TimePicker;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.DialogFragment;
 
-import com.android.settingslib.datetime.ZoneGetter;
-
 import org.lineageos.setupwizard.util.SetupWizardUtils;
 
 import java.util.Calendar;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -45,7 +42,6 @@ public class DateTimeActivity extends BaseSetupWizardActivity implements
     private static final String KEY_ID = "id"; // value: String
     private static final String KEY_DISPLAYNAME = "name"; // value: String
     private static final String KEY_GMT = "gmt"; // value: String
-    private static final String KEY_OFFSET = "offset"; // value: int (Integer)
 
     private TimeZone mCurrentTimeZone;
     private TextView mDateTextView;
@@ -189,10 +185,7 @@ public class DateTimeActivity extends BaseSetupWizardActivity implements
         final String[] from = new String[]{KEY_DISPLAYNAME, KEY_GMT};
         final int[] to = new int[]{android.R.id.text1, android.R.id.text2};
 
-        final TimeZoneComparator comparator = new TimeZoneComparator(KEY_OFFSET);
-        final List<Map<String, Object>> sortedList = ZoneGetter.getZonesList(context);
-        sortedList.sort(comparator);
-
+        List<Map<String, Object>> sortedList = WizardPageData.ready(WizardPageData.zones(context));
         return new SimpleAdapter(context,
                 sortedList,
                 R.layout.date_time_setup_custom_list_item_2,
@@ -238,35 +231,6 @@ public class DateTimeActivity extends BaseSetupWizardActivity implements
 
         if (when / 1000 < Integer.MAX_VALUE) {
             ((AlarmManager) context.getSystemService(Context.ALARM_SERVICE)).setTime(when);
-        }
-    }
-
-    private static class TimeZoneComparator implements Comparator<Map<?, ?>> {
-        private final String mSortingKey;
-
-        public TimeZoneComparator(String sortingKey) {
-            mSortingKey = sortingKey;
-        }
-
-        public int compare(Map<?, ?> map1, Map<?, ?> map2) {
-            Object value1 = map1.get(mSortingKey);
-            Object value2 = map2.get(mSortingKey);
-
-            /*
-             * This should never happen, but just in-case, put non-comparable
-             * items at the end.
-             */
-            if (!isComparable(value1)) {
-                return isComparable(value2) ? 1 : 0;
-            } else if (!isComparable(value2)) {
-                return -1;
-            }
-
-            return ((Comparable) value1).compareTo(value2);
-        }
-
-        private boolean isComparable(Object value) {
-            return (value instanceof Comparable);
         }
     }
 

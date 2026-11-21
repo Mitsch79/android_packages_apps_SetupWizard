@@ -42,6 +42,7 @@ import com.google.android.setupdesign.util.ThemeHelper;
 
 import org.lineageos.setupwizard.NavigationLayout.NavigationBarListener;
 import org.lineageos.setupwizard.util.SetupWizardUtils;
+import org.lineageos.setupwizard.wizardmanager.WizardManager;
 
 public abstract class BaseSetupWizardActivity extends AppCompatActivity implements
         NavigationBarListener {
@@ -262,6 +263,9 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
         }
         setResult(resultCode, data);
         Intent intent = WizardManagerHelper.getNextIntent(getIntent(), resultCode, data);
+        if (this instanceof WelcomeActivity || this instanceof LocaleActivity) {
+            intent = WizardManager.resolveEarlyPage(this, intent);
+        }
         mNextIntentResultLauncher.launch(intent);
     }
 

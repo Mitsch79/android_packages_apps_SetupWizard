@@ -15,6 +15,7 @@ import static org.lineageos.setupwizard.SetupWizardApp.EXTRA_PREFS_SHOW_SKIP;
 import static org.lineageos.setupwizard.SetupWizardApp.EXTRA_PREFS_SHOW_SKIP_TV;
 
 import android.content.Intent;
+import android.content.Context;
 import android.os.Bundle;
 
 import org.lineageos.setupwizard.util.SetupWizardUtils;
@@ -23,10 +24,14 @@ public class NetworkSetupActivity extends SubBaseActivity {
 
     private static final String ACTION_SETUP_NETWORK = "android.settings.NETWORK_PROVIDER_SETUP";
 
+    public static boolean shouldSkip(Context context) {
+        return (!SetupWizardUtils.hasWifi(context) && !SetupWizardUtils.hasTelephony(context))
+                || SetupWizardUtils.isNetworkConnectedToInternetViaEthernet(context);
+    }
+
     @Override
     protected void onStartSubactivity() {
-        if ((!SetupWizardUtils.hasWifi(this) && !SetupWizardUtils.hasTelephony(this)) ||
-                SetupWizardUtils.isNetworkConnectedToInternetViaEthernet(this)) {
+        if (shouldSkip(this)) {
             finishAction(RESULT_SKIP);
             return;
         }
