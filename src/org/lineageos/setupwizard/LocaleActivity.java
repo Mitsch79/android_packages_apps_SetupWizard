@@ -8,6 +8,7 @@ package org.lineageos.setupwizard;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -15,11 +16,15 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Trace;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
+import android.view.Choreographer;
+import android.view.ViewStub;
+import android.widget.TextView;
 import android.widget.NumberPicker;
 import android.widget.Toast;
 
@@ -27,6 +32,8 @@ import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.util.LocaleUtils;
 
 import com.google.android.setupcompat.util.SystemBarHelper;
+import androidx.activity.OnBackPressedCallback;
+import androidx.core.view.OneShotPreDrawListener;
 
 import org.lineageos.setupwizard.widget.LocalePicker;
 
@@ -35,7 +42,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class LocaleActivity extends BaseSetupWizardActivity {
+public class LocaleActivity extends DateTimePageHost {
 
     private static final String TAG = LocaleActivity.class.getSimpleName();
 
@@ -46,6 +53,14 @@ public class LocaleActivity extends BaseSetupWizardActivity {
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private boolean mPendingLocaleUpdate;
     private boolean mPaused = true;
+    private Intent mDateStep;
+    private View mDateContent;
+    private final OnBackPressedCallback mDateBack = new OnBackPressedCallback(false) {
+        @Override
+        public void handleOnBackPressed() {
+            displayStep(null);
+        }
+    };
 
     private final Runnable mUpdateLocale = new Runnable() {
         public void run() {
@@ -76,6 +91,80 @@ public class LocaleActivity extends BaseSetupWizardActivity {
             mLanguagePicker.setOnClickListener((View v) -> getNextButton().performClick());
         }
         loadLanguages();
+        getOnBackPressedDispatcher().addCallback(this, mDateBack);
+        View decor = getWindow().getDecorView();
+        decor.getViewTreeObserver().addOnDrawListener(() -> {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                String page = mDateStep == null ? "Language" : "Date";
+                Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                        "WizardPage:" + page + ":" + Choreographer.getInstance().getVsyncId());
+                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            }
+        });
+        Intent saved = savedInstanceState == null ? null
+                : savedInstanceState.getParcelable("dateStep", Intent.class);
+        if (saved != null) {
+            displayStep(saved);
+        } else {
+            OneShotPreDrawListener.add(decor, () -> decor.post(() -> {
+                if (!isDestroyed() && !isFinishing() && mDateStep == null) {
+                    prepareDateContent();
+                }
+            }));
+        }
+    }
+
+    private void prepareDateContent() {
+        if (mDateContent == null) {
+            mDateContent = ((ViewStub) findViewById(R.id.date_stub)).inflate();
+            mDateContent.setVisibility(View.GONE);
+        }
+        bindDateControls(mDateContent);
+    }
+
+    private void displayStep(Intent date) {
+        mDateStep = date;
+        boolean showDate = date != null;
+        if (showDate) {
+            prepareDateContent();
+            if (!mPaused) startDateControls();
+        } else {
+            stopDateControls();
+        }
+        findViewById(R.id.language_content).setVisibility(showDate ? View.GONE : View.VISIBLE);
+        mDateContent.setVisibility(showDate ? View.VISIBLE : View.GONE);
+        updatePageHeader();
+        updateDescription();
+        mDateBack.setEnabled(showDate);
+        if (!showDate) mLanguagePicker.requestFocus();
+    }
+
+    private void updateDescription() {
+        boolean date = mDateStep != null;
+        getGlifLayout().setDescriptionText(date ? getText(R.string.date_time_summary) : null);
+        TextView description = getGlifLayout().getDescriptionTextView();
+        if (description != null) description.setVisibility(date ? View.VISIBLE : View.GONE);
+    }
+
+    @Override
+    protected Intent currentStepIntent() {
+        return mDateStep == null ? super.currentStepIntent() : mDateStep;
+    }
+
+    @Override
+    protected boolean showLocalStep(Intent intent) {
+        if (mDateStep != null || !new ComponentName(this, DateTimeActivity.class).equals(
+                intent.resolveActivity(getPackageManager()))) {
+            return false;
+        }
+        displayStep(intent);
+        return true;
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putParcelable("dateStep", mDateStep);
     }
 
     @Override
@@ -86,6 +175,11 @@ public class LocaleActivity extends BaseSetupWizardActivity {
         getGlifLayout().setHeaderText(getText(getTitleResId()));
         setNextText(R.string.next);
         getWindow().getDecorView().setLayoutDirection(config.getLayoutDirection());
+        if (mDateStep != null) {
+            prepareDateContent();
+            updateDescription();
+            updateTimeAndDateDisplay();
+        }
     }
 
     @Override
@@ -115,6 +209,7 @@ public class LocaleActivity extends BaseSetupWizardActivity {
     public void onResume() {
         super.onResume();
         mPaused = false;
+        if (mDateStep != null) startDateControls();
         registerReceiver(mSimChangedReceiver,
                 new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED));
         if (mLanguagePicker != null) {
@@ -133,12 +228,12 @@ public class LocaleActivity extends BaseSetupWizardActivity {
 
     @Override
     protected int getTitleResId() {
-        return R.string.setup_locale;
+        return mDateStep == null ? R.string.setup_locale : R.string.setup_datetime;
     }
 
     @Override
     protected int getIconResId() {
-        return R.drawable.ic_locale;
+        return mDateStep == null ? R.drawable.ic_locale : R.drawable.ic_datetime;
     }
 
     private void loadLanguages() {
@@ -182,6 +277,9 @@ public class LocaleActivity extends BaseSetupWizardActivity {
         mLanguagePicker.setEnabled(true);
         mHandler.removeCallbacks(mUpdateLocale);
         mCurrentLocale = paramLocale;
+        Configuration next = new Configuration(getResources().getConfiguration());
+        next.setLocale(paramLocale);
+        WizardPageData.zones(createConfigurationContext(next));
         mHandler.postDelayed(mUpdateLocale, 1000);
     }
 

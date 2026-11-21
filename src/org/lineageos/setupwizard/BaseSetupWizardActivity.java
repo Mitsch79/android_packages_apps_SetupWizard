@@ -262,11 +262,21 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
             throw new IllegalArgumentException("Cannot call nextAction with RESULT_CANCELED");
         }
         setResult(resultCode, data);
-        Intent intent = WizardManagerHelper.getNextIntent(getIntent(), resultCode, data);
+        Intent intent = WizardManagerHelper.getNextIntent(currentStepIntent(), resultCode, data);
         if (this instanceof WelcomeActivity || this instanceof LocaleActivity) {
             intent = WizardManager.resolveEarlyPage(this, intent);
         }
-        mNextIntentResultLauncher.launch(intent);
+        if (!showLocalStep(intent)) {
+            mNextIntentResultLauncher.launch(intent);
+        }
+    }
+
+    protected Intent currentStepIntent() {
+        return getIntent();
+    }
+
+    protected boolean showLocalStep(Intent next) {
+        return false;
     }
 
     /** Adorn the Intent with Setup Wizard-related extras. */
@@ -314,6 +324,10 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
         if (getLayoutResId() != -1) {
             setContentView(getLayoutResId());
         }
+        updatePageHeader();
+    }
+
+    protected final void updatePageHeader() {
         if (getTitleResId() != -1) {
             final CharSequence headerText = TextUtils.expandTemplate(getText(getTitleResId()));
             getGlifLayout().setHeaderText(headerText);
