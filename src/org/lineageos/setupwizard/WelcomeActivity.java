@@ -11,6 +11,12 @@ import static org.lineageos.setupwizard.SetupWizardApp.ACTION_EMERGENCY_DIAL;
 import android.content.Intent;
 import android.content.ComponentName;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.HardwareRenderer;
+import android.graphics.Paint;
+import android.graphics.RecordingCanvas;
+import android.graphics.RenderNode;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,6 +43,7 @@ public class WelcomeActivity extends LocaleActivity {
 
     private View mWelcome;
     private View mPages;
+    private static boolean sPreparedLanguage;
     private Intent mLanguageStep;
     private Intent mFirstStep;
     private ActivityResultLauncher<Intent> mAuxiliary;
@@ -81,6 +88,52 @@ public class WelcomeActivity extends LocaleActivity {
             intent.putExtra(SetupWizardApp.EXTRA_WIZARD_BUNDLE, copy);
         }
         mAuxiliary.launch(intent);
+    }
+
+    private void prepareLanguageDrawing() {
+        if (!"v500".equals(android.os.Build.DEVICE) || sPreparedLanguage || mLanguageStep != null
+                || mPages.getWidth() == 0 || mPages.getHeight() == 0
+                || !mPages.isHardwareAccelerated() || isFinishing() || isDestroyed()) return;
+        sPreparedLanguage = true;
+        // Record the real picker with its current font, theme and footer. The
+        // reduced offscreen buffer lets HWUI compile the same drawing programs
+        // on first run without creating another full-size tablet buffer.
+        final int width = mPages.getWidth();
+        final int height = mPages.getHeight();
+        final int outWidth = Math.min(width, 360);
+        final int outHeight = Math.max(1, height * outWidth / width);
+        RenderNode node = new RenderNode("Setup language preparation");
+        node.setPosition(0, 0, outWidth, outHeight);
+        RecordingCanvas canvas = node.beginRecording(outWidth, outHeight);
+        try {
+            canvas.scale((float) outWidth / width, (float) outHeight / height);
+            mPages.draw(canvas);
+            Button start = mWelcome.findViewById(R.id.start);
+            Drawable.ConstantState state = start.getBackground().getConstantState();
+            if (state != null) {
+                Drawable pressed = state.newDrawable(getResources(), getTheme()).mutate();
+                pressed.setBounds(0, 0, start.getWidth(), start.getHeight());
+                pressed.setHotspot(start.getWidth() / 2f, start.getHeight() / 2f);
+                pressed.setState(new int[] {android.R.attr.state_enabled, android.R.attr.state_pressed});
+                pressed.jumpToCurrentState();
+                pressed.draw(canvas);
+            }
+            Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ink.setColor(0x66909090);
+            canvas.drawCircle(42, 42, 30, ink);
+        } finally {
+            node.endRecording();
+        }
+        new Thread(() -> {
+            try {
+                Bitmap bitmap = HardwareRenderer.createHardwareBitmap(node, outWidth, outHeight);
+                if (bitmap != null) bitmap.recycle();
+            } catch (RuntimeException e) {
+                android.util.Log.w("SetupWizard", "Offscreen language rendering unavailable", e);
+            } finally {
+                node.discardDisplayList();
+            }
+        }, "Setup language drawing").start();
     }
 
     private void bindWelcome() {
@@ -174,6 +227,7 @@ public class WelcomeActivity extends LocaleActivity {
                         WizardManagerHelper.getNextIntent(getIntent(), RESULT_OK, null));
                 if (new ComponentName(this, LocaleActivity.class).equals(next.getComponent())) {
                     mFirstStep = next;
+                    prepareLanguageDrawing();
                 }
             }));
         } else {
