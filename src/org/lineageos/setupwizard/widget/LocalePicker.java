@@ -2319,16 +2319,21 @@ public class LocalePicker extends LinearLayout {
             }
         }
 
+        private void setAccessibilityFocusState(AccessibilityNodeInfo info, int virtualId) {
+            boolean focused = mAccessibilityFocusedView == virtualId;
+            info.setAccessibilityFocused(focused);
+            // The virtual input node inherits actions from the underlying EditText.
+            info.removeAction(focused ? AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS
+                    : AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS);
+            info.addAction(focused ? AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS
+                    : AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS);
+        }
+
         private AccessibilityNodeInfo createAccessibiltyNodeInfoForInputText(
                 int left, int top, int right, int bottom) {
             AccessibilityNodeInfo info = mInputText.createAccessibilityNodeInfo();
             info.setSource(LocalePicker.this, VIRTUAL_VIEW_ID_INPUT);
-            if (mAccessibilityFocusedView != VIRTUAL_VIEW_ID_INPUT) {
-                info.addAction(AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS);
-            }
-            if (mAccessibilityFocusedView == VIRTUAL_VIEW_ID_INPUT) {
-                info.addAction(AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS);
-            }
+            setAccessibilityFocusState(info, VIRTUAL_VIEW_ID_INPUT);
             Rect boundsInParent = mTempRect;
             boundsInParent.set(left, top, right, bottom);
             info.setVisibleToUser(isVisibleToUser(boundsInParent));
@@ -2358,12 +2363,7 @@ public class LocalePicker extends LinearLayout {
             boundsInParent.offset(locationOnScreen[0], locationOnScreen[1]);
             info.setBoundsInScreen(boundsInParent);
 
-            if (mAccessibilityFocusedView != virtualViewId) {
-                info.addAction(AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS);
-            }
-            if (mAccessibilityFocusedView == virtualViewId) {
-                info.addAction(AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS);
-            }
+            setAccessibilityFocusState(info, virtualViewId);
             if (LocalePicker.this.isEnabled()) {
                 info.addAction(AccessibilityAction.ACTION_CLICK);
             }
@@ -2405,12 +2405,7 @@ public class LocalePicker extends LinearLayout {
             boundsInParent.scale(applicationScale);
             info.setBoundsInScreen(boundsInParent);
 
-            if (mAccessibilityFocusedView != View.NO_ID) {
-                info.addAction(AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS);
-            }
-            if (mAccessibilityFocusedView == View.NO_ID) {
-                info.addAction(AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS);
-            }
+            setAccessibilityFocusState(info, View.NO_ID);
             if (LocalePicker.this.isEnabled()) {
                 if (getWrapSelectorWheel() || getValue() < getMaxValue()) {
                     info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);

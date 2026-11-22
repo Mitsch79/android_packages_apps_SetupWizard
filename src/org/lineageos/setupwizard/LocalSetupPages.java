@@ -50,6 +50,8 @@ final class LocalSetupPages {
     private boolean showLockIntro;
     private boolean confirmingSkip;
     private View finishPage;
+    private int preparedLayout;
+    private View preparedView;
     private boolean sharedWithLanguage;
     private boolean covering;
 
@@ -171,7 +173,7 @@ final class LocalSetupPages {
     private void displayFinish() {
         ensureShell();
         if (finishPage == null) {
-            finishPage = host.getLayoutInflater().inflate(R.layout.finish_activity, window, false);
+            finishPage = inflatePage(R.layout.finish_activity, window);
             window.addView(finishPage);
             NavigationLayout nav = finishPage.findViewById(R.id.navigation_bar);
             nav.getNextButton().setText(R.string.start);
@@ -284,7 +286,7 @@ final class LocalSetupPages {
         current = pane;
         currentName = intent().resolveActivity(host.getPackageManager()).getClassName();
         container.removeAllViews();
-        pane.body = host.getLayoutInflater().inflate(pane.getLayoutResId(), container, false);
+        pane.body = inflatePage(pane.getLayoutResId(), container);
         pane.layout = shell;
         container.addView(pane.body);
         shell.setHeaderText(host.getText(pane.getTitleResId()));
@@ -307,7 +309,39 @@ final class LocalSetupPages {
             TextView desc = shell.getDescriptionTextView();
             if (desc != null) desc.setVisibility(desc.length() == 0 ? View.GONE : View.VISIBLE);
             pane.refresh();
+            if ("v500".equals(android.os.Build.DEVICE)) {
+                if (pane instanceof RestorePage) {
+                    preparePage(pane, R.layout.location_settings, container);
+                } else if (pane instanceof ThemeSettingsActivity.Page) {
+                    preparePage(pane, R.layout.setup_navigation, container);
+                } else if (pane instanceof NavigationSettingsActivity.Page && finishPage == null) {
+                    preparePage(pane, R.layout.finish_activity, window);
+                }
+            }
         }
+    }
+
+    private View inflatePage(int layout, FrameLayout parent) {
+        if (preparedView == null || preparedLayout != layout) {
+            return host.getLayoutInflater().inflate(layout, parent, false);
+        }
+        View view = preparedView;
+        preparedView = null;
+        return view;
+    }
+
+    private void preparePage(WizardPane source, int layout, FrameLayout parent) {
+        if (preparedView != null && preparedLayout == layout) return;
+        // Wait until the current page has submitted a frame. Bind settings
+        // and add the next view to the accessibility tree only on navigation.
+        window.getViewTreeObserver().registerFrameCommitCallback(() -> {
+            // The restore page's body is a Space. Its visible header and
+            // navigation live on the shell, while Space itself is invisible.
+            if (host.isDestroyed() || host.isFinishing() || current != source
+                    || !shell.isShown() || source.body.getParent() == null) return;
+            preparedView = host.getLayoutInflater().inflate(layout, parent, false);
+            preparedLayout = layout;
+        });
     }
 
     void refresh() {
@@ -315,6 +349,7 @@ final class LocalSetupPages {
     }
 
     void configurationChanged() {
+        preparedView = null;
         if (finishPage != null) {
             window.removeView(finishPage);
             finishPage = null;

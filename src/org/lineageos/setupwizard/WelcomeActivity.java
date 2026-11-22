@@ -13,13 +13,18 @@ import android.content.ComponentName;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.HardwareRenderer;
+import android.graphics.Outline;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.RecordingCanvas;
 import android.graphics.RenderNode;
 import android.graphics.drawable.Drawable;
+import android.hardware.HardwareBuffer;
+import android.media.ImageReader;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -68,6 +73,12 @@ public class WelcomeActivity extends LocaleActivity {
             }
         });
         mPages = getGlifLayout();
+        if ("v500".equals(android.os.Build.DEVICE)) {
+            // This window also hosts the scrolling language picker and its IME.
+            int mode = getWindow().getAttributes().softInputMode;
+            getWindow().setSoftInputMode((mode & ~WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST)
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
         FrameLayout content = findViewById(android.R.id.content);
         mWelcome = getLayoutInflater().inflate(R.layout.welcome_activity, content, false);
         content.addView(mWelcome);
@@ -124,19 +135,73 @@ public class WelcomeActivity extends LocaleActivity {
         } finally {
             node.endRecording();
         }
+        RenderNode shadow = recordButtonShadow(getNextButton());
+        float density = getResources().getDisplayMetrics().density;
         new Thread(() -> {
             try {
                 Bitmap bitmap = HardwareRenderer.createHardwareBitmap(node, outWidth, outHeight);
                 if (bitmap != null) bitmap.recycle();
+                if (shadow != null) drawButtonShadow(shadow, density);
             } catch (RuntimeException e) {
                 android.util.Log.w("SetupWizard", "Offscreen language rendering unavailable", e);
             } finally {
                 node.discardDisplayList();
+                if (shadow != null) shadow.discardDisplayList();
             }
         }, "Setup language drawing").start();
     }
 
+    private static RenderNode recordButtonShadow(View button) {
+        int width = button.getWidth();
+        int height = button.getHeight();
+        if (width == 0 || height == 0 || button.getOutlineProvider() == null) return null;
+        Outline outline = new Outline();
+        button.getOutlineProvider().getOutline(button, outline);
+        if (outline.isEmpty()) return null;
+        RenderNode caster = new RenderNode("Language footer outline");
+        caster.setPosition(0, 0, width, height);
+        caster.setOutline(outline);
+        // Include the raised pressed-state path even when the idle button is flat.
+        caster.setElevation(Math.max(button.getZ(), 4 * button.getResources().getDisplayMetrics().density));
+        caster.beginRecording().drawColor(android.graphics.Color.WHITE);
+        caster.endRecording();
+        int margin = (int) Math.ceil(caster.getElevation() * 3);
+        RenderNode scene = new RenderNode("Language footer shadow");
+        scene.setPosition(0, 0, width + margin * 2, height + margin * 2);
+        RecordingCanvas canvas = scene.beginRecording();
+        canvas.translate(margin, margin);
+        canvas.enableZ();
+        canvas.drawRenderNode(caster);
+        canvas.disableZ();
+        scene.endRecording();
+        return scene;
+    }
+
+    private static void drawButtonShadow(RenderNode scene, float density) {
+        // createHardwareBitmap disables HWUI lighting. Render one small, lit
+        // button at display scale so the first on-screen shadow can reuse its program.
+        try (ImageReader target = ImageReader.newInstance(scene.getWidth(), scene.getHeight(),
+                PixelFormat.RGBA_8888, 2, HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE)) {
+            HardwareRenderer renderer = new HardwareRenderer();
+            try {
+                renderer.setSurface(target.getSurface());
+                renderer.setLightSourceAlpha(0.04f, 0.19f);
+                renderer.setLightSourceGeometry(scene.getWidth() / 2f, 0, 600 * density, 800 * density);
+                renderer.setContentRoot(scene);
+                renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw();
+            } finally {
+                renderer.destroy();
+            }
+        }
+    }
+
     private void bindWelcome() {
+        if ("v500".equals(android.os.Build.DEVICE)) {
+            // The sw600dp welcome page is a LinearLayout. Match the shared Glif
+            // page's layout flag before either page becomes visible.
+            int layout = mPages.getSystemUiVisibility() & View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            mWelcome.setSystemUiVisibility(mWelcome.getSystemUiVisibility() | layout);
+        }
         Button startButton = mWelcome.findViewById(R.id.start);
         Button emergButton = mWelcome.findViewById(R.id.emerg_dialer);
         startButton.setOnClickListener(view -> {
