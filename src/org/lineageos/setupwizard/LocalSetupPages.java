@@ -26,6 +26,7 @@ import com.google.android.setupdesign.GlifLayout;
 import java.util.ArrayList;
 
 import org.lineageos.setupwizard.backup.RestoreIntroActivity;
+import org.lineageos.setupwizard.wizardmanager.WizardManager;
 
 /** Keeps the script intents as the back stack and draws local steps into one layout. */
 final class LocalSetupPages {
@@ -50,6 +51,8 @@ final class LocalSetupPages {
     private boolean showLockIntro;
     private boolean confirmingSkip;
     private View finishPage;
+    private Intent finishSource;
+    private Intent finishDestination;
     private int preparedLayout;
     private View preparedView;
     private boolean sharedWithLanguage;
@@ -136,6 +139,25 @@ final class LocalSetupPages {
                 .equals(step.resolveActivity(host.getPackageManager()));
     }
 
+    boolean openPreparedFinish(Intent step, int result, Intent data) {
+        if (step != finishSource || finishDestination == null || result != Activity.RESULT_OK
+                || data != null || intent() != step || !(current instanceof NavigationSettingsActivity.Page)) {
+            return false;
+        }
+        Intent destination = finishDestination;
+        finishSource = null;
+        finishDestination = null;
+        if (host.getPackageManager().resolveActivity(destination, 0) == null) return false;
+        Trace.beginSection("WizardPreparedFinish");
+        try {
+            history.add(destination);
+            displayFinish();
+        } finally {
+            Trace.endSection();
+        }
+        return true;
+    }
+
     private boolean canOfferOptionalLock() {
         UserManager users = host.getSystemService(UserManager.class);
         DevicePolicyManager policy = host.getSystemService(DevicePolicyManager.class);
@@ -172,17 +194,21 @@ final class LocalSetupPages {
 
     private void displayFinish() {
         ensureShell();
-        if (finishPage == null) {
-            finishPage = inflatePage(R.layout.finish_activity, window);
-            window.addView(finishPage);
-            NavigationLayout nav = finishPage.findViewById(R.id.navigation_bar);
-            nav.getNextButton().setText(R.string.start);
-            nav.getNextButton().setOnClickListener(v -> FinishActivity.completeFrom(host, intent()));
-        }
+        ensureFinishPage();
         currentName = FinishActivity.class.getName();
         if (shell != null) shell.setVisibility(View.INVISIBLE);
         finishPage.setVisibility(View.VISIBLE);
         back.setEnabled(true);
+    }
+
+    private void ensureFinishPage() {
+        if (finishPage != null) return;
+        finishPage = inflatePage(R.layout.finish_activity, window);
+        finishPage.setVisibility(View.INVISIBLE);
+        NavigationLayout nav = finishPage.findViewById(R.id.navigation_bar);
+        nav.getNextButton().setText(R.string.start);
+        nav.getNextButton().setOnClickListener(v -> FinishActivity.completeFrom(host, intent()));
+        window.addView(finishPage);
     }
 
     private void openLock(Intent step) {
@@ -267,6 +293,8 @@ final class LocalSetupPages {
     }
 
     private void display(WizardPane pane) {
+        finishSource = null;
+        finishDestination = null;
         ensureShell();
         FrameLayout container = shell.findViewById(R.id.wizard_page_body);
         if (!covering) {
@@ -316,8 +344,20 @@ final class LocalSetupPages {
                     preparePage(pane, R.layout.setup_lineage_settings, container);
                 } else if (pane instanceof ThemeSettingsActivity.Page) {
                     preparePage(pane, R.layout.setup_navigation, container);
-                } else if (pane instanceof NavigationSettingsActivity.Page && finishPage == null) {
-                    preparePage(pane, R.layout.finish_activity, window);
+                } else if (pane instanceof NavigationSettingsActivity.Page) {
+                    Intent source = intent();
+                    window.getViewTreeObserver().registerFrameCommitCallback(() -> {
+                        if (current == pane && intent() == source && shell.isShown()
+                                && !host.isFinishing() && !host.isDestroyed()) {
+                            ensureFinishPage();
+                            Intent next = WizardManager.resolveLocalPage(
+                                    host, WizardManagerHelper.getNextIntent(source, Activity.RESULT_OK, null));
+                            if (new ComponentName(host, FinishActivity.class).equals(next.getComponent())) {
+                                finishSource = source;
+                                finishDestination = next;
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -351,6 +391,8 @@ final class LocalSetupPages {
     }
 
     void configurationChanged() {
+        finishSource = null;
+        finishDestination = null;
         preparedView = null;
         if (finishPage != null) {
             window.removeView(finishPage);

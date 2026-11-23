@@ -339,6 +339,7 @@ public abstract class BaseSetupWizardActivity extends AppCompatActivity implemen
             throw new IllegalArgumentException("Cannot call nextAction with RESULT_CANCELED");
         }
         setResult(resultCode, data);
+        if (mPages != null && mPages.openPreparedFinish(step, resultCode, data)) return;
         Intent intent = WizardManagerHelper.getNextIntent(step, resultCode, data);
         intent = WizardManager.resolveLocalPage(this, intent);
         if (mPages != null && mPages.open(intent)) return;
