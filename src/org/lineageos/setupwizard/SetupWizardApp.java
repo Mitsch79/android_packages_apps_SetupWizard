@@ -9,19 +9,13 @@ package org.lineageos.setupwizard;
 import android.app.Application;
 import android.app.StatusBarManager;
 import android.content.Context;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import com.google.android.setupcompat.util.SetupShaderCache;
 
 import org.lineageos.setupwizard.util.SetupWizardUtils;
 
@@ -65,37 +59,9 @@ public class SetupWizardApp extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-        if (!"v500".equals(Build.DEVICE)) return;
-        File source = new File("/system_ext/etc/setupwizard-shaders");
-        if (!source.isDirectory()) return;
-        File cache = base.createDeviceProtectedStorageContext().getCacheDir();
-        if (cache == null) return;
-        for (String name : new String[] {"com.android.opengl.shaders_cache",
-                "com.android.skia.shaders_cache"}) {
-            Path destination = new File(cache, name).toPath();
-            if (Files.exists(destination)) continue;
-            Path temporary = null;
-            try {
-                temporary = Files.createTempFile(cache.toPath(), "initial-shaders-", ".tmp");
-                Files.copy(new File(source, name).toPath(), temporary, StandardCopyOption.REPLACE_EXISTING);
-                // Publish only a complete seed. Keep any cache already created by HWUI.
-                Files.createLink(destination, temporary);
-                Log.i(TAG, "Initialized " + name);
-            } catch (FileAlreadyExistsException ignored) {
-                // Another process initialized the cache.
-            } catch (IOException e) {
-                Log.w(TAG, "Could not initialize " + name, e);
-            } finally {
-                if (temporary != null) {
-                    try {
-                        Files.deleteIfExists(temporary);
-                    } catch (IOException e) {
-                        Log.w(TAG, "Could not remove temporary shader cache", e);
-                    }
-                }
-            }
-        }
+        SetupShaderCache.initialize(base);
     }
+
     private final Handler mHandler = new Handler(Looper.getMainLooper());
 
     private final Runnable mRadioTimeoutRunnable = () -> mIsRadioReady = true;

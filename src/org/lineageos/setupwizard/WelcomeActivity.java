@@ -295,6 +295,14 @@ public class WelcomeActivity extends LocaleActivity {
                     prepareLanguageDrawing();
                 }
             }));
+        } else if ("v500".equals(android.os.Build.DEVICE) && mPages.isHardwareAccelerated()) {
+            // Showing Back can resize the app surface. Let the first picker
+            // buffer reach the swap chain before requesting that relayout.
+            mPages.getViewTreeObserver().registerFrameCommitCallback(() -> {
+                if (!isDestroyed() && !isFinishing() && mLanguageStep != null) {
+                    SystemBarHelper.setBackButtonVisible(getWindow(), true);
+                }
+            });
         } else {
             OneShotPreDrawListener.add(mPages, () -> mPages.postOnAnimation(() -> {
                 if (!isDestroyed() && mLanguageStep != null) {

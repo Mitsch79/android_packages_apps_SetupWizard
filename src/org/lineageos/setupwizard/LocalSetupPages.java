@@ -312,6 +312,8 @@ final class LocalSetupPages {
             if ("v500".equals(android.os.Build.DEVICE)) {
                 if (pane instanceof RestorePage) {
                     preparePage(pane, R.layout.location_settings, container);
+                } else if (pane instanceof LocationSettingsActivity.Page) {
+                    preparePage(pane, R.layout.setup_lineage_settings, container);
                 } else if (pane instanceof ThemeSettingsActivity.Page) {
                     preparePage(pane, R.layout.setup_navigation, container);
                 } else if (pane instanceof NavigationSettingsActivity.Page && finishPage == null) {

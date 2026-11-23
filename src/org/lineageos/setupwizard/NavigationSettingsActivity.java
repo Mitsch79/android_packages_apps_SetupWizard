@@ -100,29 +100,6 @@ public class NavigationSettingsActivity extends PaneActivity {
                 mHideGesturalHint.setVisibility(View.GONE);
             }
 
-            radioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                switch (checkedId) {
-                    case R.id.radio_gesture:
-                        mSelection = NAV_BAR_MODE_GESTURAL_OVERLAY;
-                        navigationIllustration
-                                .setAnimation(R.raw.lottie_system_nav_fully_gestural);
-                        revealHintCheckbox();
-                        break;
-                    case R.id.radio_two_button:
-                        mSelection = NAV_BAR_MODE_2BUTTON_OVERLAY;
-                        navigationIllustration.setAnimation(R.raw.lottie_system_nav_2_button);
-                        hideHintCheckBox();
-                        break;
-                    case R.id.radio_sw_keys:
-                        mSelection = NAV_BAR_MODE_3BUTTON_OVERLAY;
-                        navigationIllustration.setAnimation(R.raw.lottie_system_nav_3_button);
-                        hideHintCheckBox();
-                        break;
-                }
-
-                mSetupWizardApp.getSettingsBundle().putString(DRAFT_MODE, mSelection);
-                navigationIllustration.playAnimation();
-            });
             Bundle draft = mSetupWizardApp.getSettingsBundle();
             String desired = draft.getString(DRAFT_MODE, mSelection);
             int id = NAV_BAR_MODE_2BUTTON_OVERLAY.equals(desired) ? R.id.radio_two_button
@@ -137,14 +114,54 @@ public class NavigationSettingsActivity extends PaneActivity {
                     }
                 }
             }
-            radioGroup.clearCheck();
             radioGroup.check(id);
+            selectNavigation(id, navigationIllustration, true);
+            radioGroup.setOnCheckedChangeListener((group, checkedId) ->
+                    selectNavigation(checkedId, navigationIllustration, false));
             if (!mIsTaskbarEnabled) {
                 mHideGesturalHint.setChecked(draft.getBoolean(DRAFT_HINT,
                         LineageSettings.System.getIntForUser(getContentResolver(),
                                 LineageSettings.System.NAVIGATION_BAR_HINT, 1, UserHandle.USER_CURRENT) == 0));
                 mHideGesturalHint.setOnCheckedChangeListener((button, value) ->
                         draft.putBoolean(DRAFT_HINT, value));
+            }
+        }
+
+        private void selectNavigation(int id, LottieAnimationView illustration, boolean initial) {
+            int animation;
+            switch (id) {
+                case R.id.radio_gesture:
+                    mSelection = NAV_BAR_MODE_GESTURAL_OVERLAY;
+                    animation = R.raw.lottie_system_nav_fully_gestural;
+                    revealHintCheckbox();
+                    break;
+                case R.id.radio_two_button:
+                    mSelection = NAV_BAR_MODE_2BUTTON_OVERLAY;
+                    animation = R.raw.lottie_system_nav_2_button;
+                    hideHintCheckBox();
+                    break;
+                case R.id.radio_sw_keys:
+                    mSelection = NAV_BAR_MODE_3BUTTON_OVERLAY;
+                    animation = R.raw.lottie_system_nav_3_button;
+                    hideHintCheckBox();
+                    break;
+                default:
+                    return;
+            }
+            mSetupWizardApp.getSettingsBundle().putString(DRAFT_MODE, mSelection);
+            // The freshly inflated layout has already requested the gesture composition.
+            if (!initial || id != R.id.radio_gesture) illustration.setAnimation(animation);
+            if (initial && "v500".equals(android.os.Build.DEVICE) && illustration.isHardwareAccelerated()) {
+                illustration.pauseAnimation();
+                illustration.setProgress(0f);
+                String initialMode = mSelection;
+                illustration.getViewTreeObserver().registerFrameCommitCallback(() -> {
+                    if (illustration.isShown() && initialMode.equals(mSelection) && !illustration.isAnimating()) {
+                        illustration.playAnimation();
+                    }
+                });
+            } else {
+                illustration.playAnimation();
             }
         }
 

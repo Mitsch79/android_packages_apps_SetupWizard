@@ -10,7 +10,6 @@ import static android.content.Context.MODE_PRIVATE;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
 import static android.content.pm.PackageManager.DONT_KILL_APP;
-import static android.content.pm.PackageManager.GET_ACTIVITIES;
 import static android.telephony.TelephonyManager.PHONE_TYPE_GSM;
 
 import static com.android.internal.telephony.PhoneConstants.LTE_ON_CDMA_TRUE;
@@ -163,7 +162,7 @@ public class SetupWizardUtils {
     public static boolean isPackageInstalled(Context context, String packageName) {
         PackageManager pm = context.getPackageManager();
         try {
-            pm.getPackageInfo(packageName, GET_ACTIVITIES);
+            pm.getPackageInfo(packageName, 0);
             return true;
         } catch (PackageManager.NameNotFoundException e) {
             return false;
